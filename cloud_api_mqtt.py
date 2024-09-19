@@ -11,16 +11,21 @@ import tkinter as tk
 
 from dotenv import load_dotenv
 
+from dji_error_codes import DjiErrorCodes
+
 load_dotenv()
 
 ui_window = tk.Tk()
 ui_window.title("Manage DJI Mavic 3E")
-text_status_replies = tk.Text(ui_window, height=8)
+text_status_replies = tk.Text(ui_window)
 
 rc_sn_value = tk.StringVar(value="RC S\\N:")
 uav_sn_value = tk.StringVar(value="UAV S\\N:")
 gw_sn = ""
 uav_sn = ""
+
+error_codes = DjiErrorCodes()
+
 
 def on_connect(c, userdata, flags, rc, _):
     print("Connected with result code " + str(rc))
@@ -39,20 +44,29 @@ def handle_osd_message(message: dict):
 def on_message(c: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     print("📨Got msg: " + msg.topic)
     message = json.loads(msg.payload.decode("utf-8"))
+    message_data_ = message["data"]
     if msg.topic.endswith("_reply"):
         print(json.dumps(message))
-        text_status_replies.insert(tk.END, "method: " + message["method"] + "\n")
-        text_status_replies.insert(tk.END, "data: " + json.dumps(message["data"]) + "\n")
+        if "method" in message:
+            text_status_replies.insert(tk.END, "method: " + message["method"] + "\n")
+        text_status_replies.insert(tk.END, "topic: " + msg.topic + "\n")
+        text_status_replies.insert(tk.END, "data: " + json.dumps(message_data_) + "\n")
+        if "result" in message_data_:
+            error_text = error_codes[message_data_["result"]]
+            if error_text:
+                text_status_replies.insert(tk.END, error_text + "\n")
+        text_status_replies.insert(tk.END, "\n")
+
 
     global uav_sn, gw_sn
     if msg.topic.endswith("status"):
         if message["method"] != "update_topo":
             return
 
-        if len(message["data"]["sub_devices"]) == 0:
+        if len(message_data_["sub_devices"]) == 0:
             uav_sn_value.set(f"UAV S\\N:")
         else:
-            uav_sn = message["data"]["sub_devices"][0]["sn"]
+            uav_sn = message_data_["sub_devices"][0]["sn"]
             uav_sn_value.set(f"UAV S\\N: {uav_sn}")
 
         response = {
@@ -68,6 +82,9 @@ def on_message(c: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         gw_sn = json.loads(msg.payload)['gateway']
         if gw_sn == topic_sn:
             rc_sn_value.set(f"RC S\\N: {topic_sn}")
+        else:
+            uav_sn = topic_sn
+            uav_sn_value.set(f"UAV S\\N: {uav_sn}")
         handle_osd_message(message)
 
 
@@ -99,6 +116,13 @@ def request_control():
                 {"user_id": 1, "user_callsign": "Slavko", "control_keys": ["flight"]})
 
 
+def release_control():
+    global gw_sn
+    if gw_sn:
+        publish("cloud_control_release",
+                {"control_keys": ["flight"]})
+
+
 def start_stream():
     global gw_sn, uav_sn
     if gw_sn and uav_sn:
@@ -111,6 +135,7 @@ def start_stream():
                 },
                 )
 
+
 def stop_stream():
     global gw_sn, uav_sn
     if gw_sn and uav_sn:
@@ -121,12 +146,22 @@ def stop_stream():
                 )
 
 
+def take_photo():
+    global gw_sn
+    if gw_sn:
+        publish("camera_photo_take", {
+            "payload_index": "66-0-0",
+        }, )
+
+
 # GUI
 
 frame_buttons = tk.Frame(ui_window)
 frame_buttons.pack(pady=10)
 
 button_request_control = tk.Button(frame_buttons, text="Request control", command=request_control)
+button_release_control = tk.Button(frame_buttons, text="Release control", command=release_control)
+button_take_photo = tk.Button(frame_buttons, text="Take photo", command=take_photo)
 button_start_stream = tk.Button(frame_buttons, text="Start stream", command=start_stream)
 button_stop_stream = tk.Button(frame_buttons, text="Stop stream", command=stop_stream)
 
@@ -136,16 +171,16 @@ label_frame.pack(side=tk.TOP, pady=10)
 label_rc_sn = tk.Label(label_frame, textvariable=rc_sn_value)
 label_uav_sn = tk.Label(label_frame, textvariable=uav_sn_value)
 
-
 scroll = tk.Scrollbar(ui_window)
 text_status_replies.configure(yscrollcommand=scroll.set)
-# status_replies_text.config(state=DISABLED)
 text_status_replies.pack(side=tk.LEFT)
 
 scroll.config(command=text_status_replies.yview)
 scroll.pack(side=tk.RIGHT, fill=tk.Y)
 
 button_request_control.pack(side=tk.LEFT, padx=10)
+button_release_control.pack(side=tk.LEFT, padx=10)
+button_take_photo.pack(side=tk.LEFT, padx=10)
 button_start_stream.pack(side=tk.LEFT, padx=10)
 button_stop_stream.pack(side=tk.LEFT, padx=10)
 

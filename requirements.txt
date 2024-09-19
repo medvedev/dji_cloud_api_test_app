@@ -1,2 +1,5 @@
-FastAPI
+FastAPI==0.115.0
+opencv-python~=4.10.0.84
 paho-mqtt >= 2
+python-dotenv~=1.0.1
+uvicorn~=0.30.6

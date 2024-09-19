@@ -24,54 +24,89 @@
     </div>
     <ul id="logs"></ul>
     <script>
-      const APP_ID = 130943;
+      const APP_ID = 151135;
       const LICENSE =
-        "HdMDWuYVpt05j3pIk+/vqoJlfY+SP6vp7z6XDyzGeM0d+Oy4JavUyYP/VsOw5i0UE07Lt5q9rzk9Jex1+CnPQO7OzBE6XwcNwZ0pDP/LPTjqdSPRezbmRB8z5yNf5QbEhe1YyLh++JzW9mr9BCkXy1v1h2+Uo0S1MSRZcLgLRw0=";
-      const APP_KEY = "36de02838593125bbe9ab32d08813fb";
-      var fieldList = document.getElementById("logs");
-      var log = function (msg) {
-        var li = document.createElement("li");
-        li.innerText = msg;
-        fieldList.appendChild(li);
+        "%dji_license%";
+      const APP_KEY = "36addda43d756a8ec33fa67d9419bba";
+      const fieldList = document.getElementById("logs");
+      const log = function (msg) {
+          const li = document.createElement("li");
+          li.innerText = msg;
+          fieldList.appendChild(li);
       };
-      var reg_calback = function () {
+      const reg_calback = function () {
         log("Callback called🎉, arguments:" + Array.from(arguments));
       };
-      var loginButton = document.getElementById("login-button");
+      const ws_callback = function(arg) {
+          log("WS callback with data: " + arg)
+      }
+      const loginButton = document.getElementById("login-button");
+      const djiBridge = window.djiBridge;
       loginButton.addEventListener("click", function () {
         log("login");
-        var token = window.djiBridge.platformVerifyLicense(
-          APP_ID,
-          APP_KEY,
-          LICENSE
-        );
-        log("platform is verified: " + window.djiBridge.platformIsVerified());
+          const token = djiBridge.platformVerifyLicense(
+              APP_ID,
+              APP_KEY,
+              LICENSE
+          );
 
-        var register_params = JSON.stringify({
-          host: "tcp://hostnamehere:1883", // mqtt address, example: tcp://xx.xx.xx.xx:xxx
-          connectCallback: "reg_calback", // js interface for connection status callbacks
-          username: "userloginhere",
-          password: "userpasswordhere",
-        });
-        log(
+          const register_thing_params = JSON.stringify({
+              host: "tcp://%mqtt_hostname%:1883", // mqtt address, example: tcp://xx.xx.xx.xx:xxx
+              connectCallback: "reg_calback", // js interface for connection status callbacks
+              username: "%mqtt_user_login%",
+              password: "%mqtt_user_password%",
+          });
+          log(
           "Load Component: thing " +
-            window.djiBridge.platformLoadComponent("thing", register_params) +
+            djiBridge.platformLoadComponent("thing", register_thing_params) +
             "\n Stateℹ️: " +
-            window.djiBridge.thingGetConnectState()
+            djiBridge.thingGetConnectState()
+        );
+          const register_ws_params = JSON.stringify({
+              host: "ws://192.168.1.74:5000/ws",
+              token: "token_value",
+              connectCallback: "ws_callback",
+          });
+          log(
+            "Load Component: ws " +
+            djiBridge.platformLoadComponent("ws", register_ws_params) +
+            "\n Stateℹ️: " +
+            djiBridge.wsGetConnectState()
+
         );
         log(
           "Start the connection thingconn: " +
-            window.djiBridge.thingConnect("userloginhere", "userpasswordhere", "reg_calback")
+            djiBridge.thingConnect("%mqtt_userlogin%", "%mqtt_userpassword%", "reg_calback")
         );
 
-        log("Thing Connect state: " + window.djiBridge.thingGetConnectState());
-        // log("TODO here I am supposed to ask about login, password, gateway");
-      });
+        log("Thing Connect state: " + djiBridge.thingGetConnectState());
 
-      var logoutButton = document.getElementById("logout-button");
+        log(
+          "Start the connection WS: " +
+            djiBridge.wsConnect("ws://192.168.1.74:5000/ws", "token_value", "ws_callback")
+        );
+
+        log("WS Connect state: " + djiBridge.wsGetConnectState());
+
+        log("platform is verified: " + djiBridge.platformIsVerified());
+
+        log("Set workspace ID: " + djiBridge.platformSetWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069"))
+
+        const keep_running = function () {
+          return true
+        };
+
+        djiBridge.onBackClick(keep_running)
+
+        log("Set workspace stuff:" + djiBridge.platformSetInformation("platformName", "workspaceName", "desc"))
+
+
+        });
+
+      const logoutButton = document.getElementById("logout-button");
       logoutButton.addEventListener("click", function () {
         log(
-          "unregistering: " + window.djiBridge.platformUnloadComponent("thing")
+          "unregistering: " + djiBridge.platformUnloadComponent("thing")
         );
       });
 
@@ -80,13 +115,14 @@
         .addEventListener("click", function () {
           log(
             "Statusy platformIsComponentLoaded: " +
-              window.djiBridge.platformIsComponentLoaded("thing") +
+              djiBridge.platformIsComponentLoaded("thing") +
               "\nthing state" +
-              window.djiBridge.thingGetConnectState()
+              djiBridge.thingGetConnectState()
           );
+          log("Aircraft SN: " + djiBridge.platformGetAircraftSN())
+          log("Things config:" + djiBridge.thingGetConfigs())
         });
 
-      log("platform is verified: " + window.djiBridge.platformIsVerified());
     </script>
   </body>
 </html>
